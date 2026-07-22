@@ -20,7 +20,7 @@ from enum import Enum
 import aio_pika
 from aio_pika.exceptions import AMQPChannelError
 
-from fastapi_app.core.config import settings
+from fastapi_app.core import settings
 from .setup import rmq_setup
 
 

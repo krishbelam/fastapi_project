@@ -18,19 +18,18 @@ Why queue.get() instead of queue.iterator()?
 
 import asyncio
 import json
-import logging
 from typing import Callable, Awaitable
 
 import aio_pika
 from aio_pika import IncomingMessage
 from aio_pika.exceptions import QueueEmpty
 
-from fastapi_app.core.config import settings
+from fastapi_app.core import settings
 from fastapi_app.rmq.health import set_shared_channel, rmq_health, RMQStatus
 from fastapi_app.rmq.setup import rmq_setup
+from logger_engine import logger
 
 
-logger = logging.getLogger(__name__)
 
 MessageHandler = Callable[[dict], Awaitable[None]]
 
@@ -195,6 +194,8 @@ def _spawn_task(message: IncomingMessage) -> None:
     Creates a tracked task for _process_message.
     The task removes itself from _active_tasks when done.
     """
+    logger.debug(f"📩 Spawning task for message: {message.body[:100]}")  # ← add
+
     task = asyncio.create_task(
         _process_message(message),
         name=f"msg-{message.message_id or id(message)}",

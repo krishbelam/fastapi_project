@@ -9,7 +9,7 @@ import asyncio
 import logging
 import aio_pika
 
-from fastapi_app.core.config import settings
+from fastapi_app.core import settings
 
 logger = logging.getLogger(__name__)
 

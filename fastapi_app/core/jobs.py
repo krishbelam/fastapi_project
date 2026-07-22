@@ -10,14 +10,13 @@ Two execution modes:
 """
 
 import asyncio
-import logging
 import time
 from datetime import datetime
 from typing import Any
 
 from core.store import broadcast_ws, job_status_store
 
-logger = logging.getLogger(__name__)
+from logger_engine import logger
 
 
 # ── Async variant ─────────────────────────────────────────────────────────────
