@@ -29,8 +29,6 @@ from fastapi_app.rmq.health import set_shared_channel, rmq_health, RMQStatus
 from fastapi_app.rmq.setup import rmq_setup
 from logger_engine import logger
 
-
-
 MessageHandler = Callable[[dict], Awaitable[None]]
 
 # ── Handler registry ──────────────────────────────────────────────────────────
@@ -39,23 +37,27 @@ _handlers: dict[str, MessageHandler] = {}
 
 def register_handler(event_type: str):
     """Decorator to register an async handler for a given event_type."""
+    msg_from = "register_handler"
     def decorator(fn: MessageHandler):
         _handlers[event_type] = fn
-        logger.info(f"📋 Registered handler for event_type='{event_type}'")
+        logger.info(msg_from=msg_from, msg=f"📋 Registered handler for event_type='{event_type}'")
         return fn
+
     return decorator
 
 
 # ── Example handlers ──────────────────────────────────────────────────────────
 @register_handler("user.created")
 async def handle_user_created(data: dict) -> None:
-    logger.info(f"[user.created] {data}")
+    msg_from = "user.created"
+    logger.info(msg_from=msg_from, msg=f"[user.created] {data}")
     await asyncio.sleep(0.1)
 
 
 @register_handler("job.requested")
 async def handle_job_requested(data: dict) -> None:
-    logger.info(f"[job.requested] {data}")
+    msg_from = "job.requested"
+    logger.info(msg_from=msg_from, msg=f"[job.requested] {data}")
     await asyncio.sleep(0.2)
 
 
@@ -84,10 +86,13 @@ def _get_semaphore() -> asyncio.Semaphore:
     Never create asyncio primitives at module import time.
     """
     global _semaphore
+    msg_from = "Semaphore"
+
     if _semaphore is None:
         _semaphore = asyncio.Semaphore(settings.RMQ_MAX_CONCURRENT_TASKS)
-        logger.info(f"🔒 Semaphore initialised: max={settings.RMQ_MAX_CONCURRENT_TASKS}")
+        logger.info(msg_from=msg_from, msg=f"🔒 Semaphore initialised: max={settings.RMQ_MAX_CONCURRENT_TASKS}")
     return _semaphore
+
 
 # ================================================================================
 #           Old Approach with: async with message.process(requeue=False)
@@ -110,14 +115,14 @@ def _get_semaphore() -> asyncio.Semaphore:
 #
 #     async with semaphore:                               # ← SAFETY BRAKE
 #         active = settings.RMQ_MAX_CONCURRENT_TASKS - semaphore._value
-#         logger.debug(f"⚙️  Slot acquired — active tasks: {active}/{settings.RMQ_MAX_CONCURRENT_TASKS}")
+#         logger.debug(msg_from=msg_from, msg=f"⚙️  Slot acquired — active tasks: {active}/{settings.RMQ_MAX_CONCURRENT_TASKS}")
 #
 #         async with message.process(requeue=False):
 #             # ── Parse ─────────────────────────────────────────────────
 #             try:
 #                 body = json.loads(message.body.decode())
 #             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-#                 logger.error(f"💥 Bad JSON (dropping): {exc}  raw={message.body[:120]}")
+#                 logger.error(msg_from=msg_from, msg=f"💥 Bad JSON (dropping): {exc}  raw={message.body[:120]}")
 #                 return                                  # nack, requeue=False
 #
 #             event_type = body.get("event_type", "")
@@ -125,21 +130,21 @@ def _get_semaphore() -> asyncio.Semaphore:
 #
 #             # ── Route ─────────────────────────────────────────────────
 #             if handler is None:
-#                 logger.warning(f"⚠️  No handler for '{event_type}' — dropping")
+#                 logger.warning(msg_from=msg_from, msg=f"⚠️  No handler for '{event_type}' — dropping")
 #                 return                                  # nack, requeue=False
 #
 #             # ── Execute ───────────────────────────────────────────────
 #             try:
 #                 await handler(body)                     # ← your business logic
 #             except Exception as exc:
-#                 logger.error(f"💥 Handler '{event_type}' raised: {exc} — requeueing")
+#                 logger.error(msg_from=msg_from, msg=f"💥 Handler '{event_type}' raised: {exc} — requeueing")
 #                 await message.nack(requeue=True)
 #                 raise
 # ================================================================================
 
 
 # ── Core message processor ────────────────────────────────────────────────────
-async def _process_message(message: IncomingMessage) -> None:
+async def _process_message(message: IncomingMessage, msg_from=None) -> None:
     """
     Wraps handler execution with the semaphore.
 
@@ -154,31 +159,32 @@ async def _process_message(message: IncomingMessage) -> None:
     """
     semaphore = _get_semaphore()
 
-    async with semaphore:                               # ← SAFETY BRAKE
+    async with semaphore:  # ← SAFETY BRAKE
         active = settings.RMQ_MAX_CONCURRENT_TASKS - semaphore._value
-        logger.debug(f"⚙️  Slot acquired — active tasks: {active}/{settings.RMQ_MAX_CONCURRENT_TASKS}")
+        logger.debug(msg_from=msg_from,
+                     msg=f"⚙️  Slot acquired — active tasks: {active}/{settings.RMQ_MAX_CONCURRENT_TASKS}")
 
         async with message.process(requeue=False):
             # ── Parse ─────────────────────────────────────────────────
             try:
                 body = json.loads(message.body.decode())
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-                logger.error(f"💥 Bad JSON (dropping): {exc}  raw={message.body[:120]}")
-                return                                  # nack, requeue=False
+                logger.error(msg_from=msg_from, msg=f"💥 Bad JSON (dropping): {exc}  raw={message.body[:120]}")
+                return  # nack, requeue=False
 
             event_type = body.get("event_type", "")
-            handler    = _handlers.get(event_type)
+            handler = _handlers.get(event_type)
 
             # ── Route ─────────────────────────────────────────────────
             if handler is None:
-                logger.warning(f"⚠️  No handler for '{event_type}' — dropping")
-                return                                  # nack, requeue=False
+                logger.warning(msg_from=msg_from, msg=f"⚠️  No handler for '{event_type}' — dropping")
+                return  # nack, requeue=False
 
             # ── Execute ───────────────────────────────────────────────
             try:
-                await handler(body)                     # ← your business logic
+                await handler(body)  # ← your business logic
             except Exception as exc:
-                logger.error(f"💥 Handler '{event_type}' raised: {exc} — requeueing")
+                logger.error(msg_from=msg_from, msg=f"💥 Handler '{event_type}' raised: {exc} — requeueing")
                 await message.nack(requeue=True)
                 raise
 
@@ -189,44 +195,45 @@ async def _process_message(message: IncomingMessage) -> None:
 _active_tasks: set[asyncio.Task] = set()
 
 
-def _spawn_task(message: IncomingMessage) -> None:
+def _spawn_task(message: IncomingMessage, msg_from=None) -> None:
     """
     Creates a tracked task for _process_message.
     The task removes itself from _active_tasks when done.
     """
-    logger.debug(f"📩 Spawning task for message: {message.body[:100]}")  # ← add
+    logger.debug(msg_from=msg_from, msg=f"📩 Spawning task for message: {message.body[:100]}")  # ← add
 
     task = asyncio.create_task(
-        _process_message(message),
+        _process_message(message, msg_from=msg_from),
         name=f"msg-{message.message_id or id(message)}",
     )
     _active_tasks.add(task)
-    task.add_done_callback(_active_tasks.discard)       # auto-cleanup on finish
+    task.add_done_callback(_active_tasks.discard)  # auto-cleanup on finish
 
 
-async def _drain_tasks(timeout: float = 30.0) -> None:
+async def _drain_tasks(timeout: float = 30.0, msg_from=None) -> None:
     """
     Wait for all in-flight tasks to finish before shutdown.
     Gives handlers time to ack their messages cleanly.
     """
     if not _active_tasks:
+        logger.info(msg_from=msg_from, msg=f"No tasks to Drain {len(_active_tasks)} in-flight tasks (timeout={timeout}s)")
         return
-    logger.info(f"⏳ Draining {len(_active_tasks)} in-flight tasks (timeout={timeout}s)")
+    logger.info(msg_from=msg_from, msg=f"⏳ Draining {len(_active_tasks)} in-flight tasks (timeout={timeout}s)")
     try:
         await asyncio.wait_for(
             asyncio.gather(*_active_tasks, return_exceptions=True),
             timeout=timeout,
         )
-        logger.info("✅ All tasks drained")
+        logger.info(msg_from=msg_from, msg="✅ All tasks drained")
     except asyncio.TimeoutError:
         remaining = len(_active_tasks)
-        logger.warning(f"⚠️  Drain timeout — {remaining} tasks still running, cancelling")
+        logger.warning(msg_from=msg_from, msg=f"⚠️  Drain timeout — {remaining} tasks still running, cancelling")
         for task in list(_active_tasks):
             task.cancel()
 
 
 # ── Consumer loop ─────────────────────────────────────────────────────────────
-async def rmq_consumer(retry_delay_time=10) -> None:
+async def rmq_consumer(retry_delay_time=10, msg_from=None) -> None:
     """
     Runs for the entire app lifetime (started as asyncio.create_task in lifespan).
 
@@ -237,7 +244,8 @@ async def rmq_consumer(retry_delay_time=10) -> None:
         4. connect_robust   → auto-reconnects on transient drops
         5. while True       → re-connects after hard broker failures
     """
-    logger.info(f"📨 RabbitMQ consumer starting, retry_delay_time was set to {retry_delay_time}")
+    msg_from = msg_from if msg_from else "RabbitMQ Consumer"
+    logger.info(msg_from=msg_from, msg=f"📨 RabbitMQ consumer starting, retry_delay_time was set to {retry_delay_time}")
 
     while True:
         connection = None
@@ -246,11 +254,11 @@ async def rmq_consumer(retry_delay_time=10) -> None:
                 settings.RABBITMQ_URL,
                 reconnect_interval=5,
             )
-            logger.info("✅ RabbitMQ consumer connected")
+            logger.info(msg_from=msg_from, msg="✅ RabbitMQ consumer connected")
 
             async with connection:
                 channel = await connection.channel()
-                set_shared_channel(channel)   # health checker uses this for passive probes
+                set_shared_channel(channel)  # health checker uses this for passive probes
 
                 # prefetch_count ← first safety brake (broker side)
                 # Must match or be <= RMQ_MAX_CONCURRENT_TASKS (semaphore)
@@ -267,20 +275,20 @@ async def rmq_consumer(retry_delay_time=10) -> None:
                 # If the queue is deleted, fail loudly so health checker catches it.
                 queue = await channel.declare_queue(
                     settings.RMQ_QUEUE,
-                    passive=True,   # ← raises AMQPChannelError (404) if queue missing
+                    passive=True,  # ← raises AMQPChannelError (404) if queue missing
                 )
                 await queue.bind(exchange, routing_key=settings.RMQ_ROUTING_KEY)
 
-                logger.info(
-                    f"📨 Consuming  queue='{settings.RMQ_QUEUE}'  "
-                    f"prefetch={settings.RMQ_PREFETCH_COUNT}  "
-                    f"max_concurrent={settings.RMQ_MAX_CONCURRENT_TASKS}"
-                )
+                logger.info(msg_from=msg_from, msg=
+                f"📨 Consuming  queue='{settings.RMQ_QUEUE}'  "
+                f"prefetch={settings.RMQ_PREFETCH_COUNT}  "
+                f"max_concurrent={settings.RMQ_MAX_CONCURRENT_TASKS}"
+                            )
                 #
                 # async with queue.iterator() as messages:
                 #     async for message in messages:
                 #         _spawn_task(message)
-                #     logger.info("📨 Iterator exited")  # ← add this
+                #     logger.info(msg_from=msg_from, msg="📨 Iterator exited")  # ← add this
 
                 # ── Poll loop (replaces queue.iterator()) ─────────────────
                 # queue.iterator() hangs forever on queue deletion.
@@ -289,7 +297,7 @@ async def rmq_consumer(retry_delay_time=10) -> None:
                 while True:
                     try:
                         message = await queue.get(timeout=5, no_ack=False)
-                        _spawn_task(message)
+                        _spawn_task(message, msg_from=msg_from)
                     except QueueEmpty:
                         # No messages right now — yield to event loop and retry
                         await asyncio.sleep(0.1)
@@ -306,28 +314,29 @@ async def rmq_consumer(retry_delay_time=10) -> None:
             # even before its next tick fires.
             rmq_health.status = RMQStatus.DEGRADED
             set_shared_channel(None)
-            logger.error(
-                f"💥 Channel error — queue '{settings.RMQ_QUEUE}' likely deleted: {exc}  "
-                f"retrying in{retry_delay_time}s"
-            )
+            logger.error(msg_from=msg_from, msg=
+            f"💥 Channel error — queue '{settings.RMQ_QUEUE}' likely deleted: {exc}  "
+            f"retrying in{retry_delay_time}s"
+                         )
             await rmq_setup()  # <--- Recreates the missing Queue
             await asyncio.sleep(retry_delay_time)
 
         except aio_pika.exceptions.AMQPConnectionError as exc:
-            logger.warning(f"🔴 RabbitMQ connection lost: {exc} — retrying in 5{retry_delay_time}")
+            logger.warning(msg_from=msg_from,
+                           msg=f"🔴 RabbitMQ connection lost: {exc} — retrying in 5{retry_delay_time}")
             set_shared_channel(None)
             await asyncio.sleep(retry_delay_time)
 
 
         except asyncio.CancelledError:
-            logger.info("📨 Consumer cancelled — draining in-flight tasks")
+            logger.info(msg_from=msg_from, msg="📨 Consumer cancelled — draining in-flight tasks")
             set_shared_channel(None)
-            await _drain_tasks(timeout=settings.RMQ_DRAIN_TIMEOUT_SECS)
+            await _drain_tasks(timeout=settings.RMQ_DRAIN_TIMEOUT_SECS, msg_from=msg_from)
             if connection and not connection.is_closed:
                 await connection.close()
             raise
 
         except Exception as exc:
-            logger.error(f"💥 Unexpected error: {exc} — retrying in {retry_delay_time}s")
+            logger.error(msg_from=msg_from, msg=f"💥 Unexpected error: {exc} — retrying in {retry_delay_time}s")
             set_shared_channel(None)
             await asyncio.sleep(retry_delay_time)

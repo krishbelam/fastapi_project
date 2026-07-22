@@ -1,10 +1,13 @@
 # ─────────────────────────────────────────────
 # Logging
 # ─────────────────────────────────────────────
+import io
 import sys
 import queue
 import logging
 import inspect
+import platform
+import datetime
 import logging.config
 import logging.handlers
 from fastapi_app.core import settings
@@ -130,7 +133,7 @@ logger = logging.getLogger('console_file')
 
 # ── Actual handlers (run in listener thread — no file locking issues) ──────────
 _log_queue = queue.Queue(maxsize=-1)  # unbounded — adjust if memory is concern
-_file_handler = logging.FileHandler(settings.LOG_FILE_PATH)
+_file_handler = logging.FileHandler(settings.LOG_FILE_PATH, encoding="utf-8")
 _file_handler.setLevel(LOG_LEVEL)
 _file_handler.setFormatter(logging.Formatter(
     # fmt="{asctime} [{levelname}] {filename} - {funcName}: {lineno} | {message}",
@@ -142,15 +145,20 @@ _rotating_file_backup_count = 5
 _rotating_file_handler = logging.handlers.RotatingFileHandler(
     settings.LOG_FILE_PATH,
     maxBytes=_rotating_file_max_bytes,
-    backupCount=_rotating_file_backup_count
+    backupCount=_rotating_file_backup_count,
+    encoding="utf-8"
 )
 _rotating_file_handler.setLevel(LOG_LEVEL)
 _rotating_file_handler.setFormatter(logging.Formatter(
     fmt="{message}",
     style="{",
 ))
+if str(platform.platform()).lower() == 'Windows':
+    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    _console_handler = logging.StreamHandler(stream=utf8_stdout)
+else:
+    _console_handler = logging.StreamHandler(stream=sys.stdout)
 
-_console_handler = logging.StreamHandler(stream=sys.stdout)
 _console_handler.setLevel(LOG_LEVEL)
 _console_handler.setFormatter(logging.Formatter(
     # fmt="{asctime} [{levelname}] {filename} - {funcName}: {lineno} | {message}",
@@ -234,11 +242,12 @@ class Logger(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         return self
 
-    def get_msg_context(self, msg_from, msg, log_level,  stack_info):
+    def get_msg_context(self, msg_from, msg, log_level, stack_info):
         current_stack_info = stack_info[2]
         file, fun, lineno = current_stack_info.filename, current_stack_info.function, current_stack_info.lineno
         file = file.rsplit(settings.ROOT_DIR, 1)[1]
-        msg = f"{msg_from} | [{log_level}] | .{file} - {fun} : {lineno} | {msg}"
+        dt = datetime.datetime.now().strftime(settings.LOG_DATETIME_FMT)
+        msg = f"{dt} {msg_from} [{log_level}] .{file} - {fun} : {lineno} | {msg}"
         return msg
 
     def debug(self, msg, msg_from=None):
@@ -265,7 +274,6 @@ class Logger(object):
             getattr(self._instance._logger, log_level)(msg)
         else:
             print(f"Direct Print, not log_level in logger | {log_level}: {msg}")
-
 
 
 # ── Default logger — same as before ──────────────────────────────────────────

@@ -11,12 +11,14 @@ import pathlib
 from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, model_validator, fields
+from pydantic import Field, model_validator
 
 PLATFORM_LOG_DIR_MAP = {
     "Windows": "C:\\fastapi_app\\logs\\",
     "Linux": "/var/log/fastapi_app",
 }
+ENV_FILE_PATH = str(pathlib.Path(__file__).parent.parent.parent / ".env")
+
 
 # ===========================================================================
 #               Exception raised as part of Configs Setup
@@ -27,7 +29,8 @@ class UnSupportedPlatform(ValueError):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # env_file=".env",
+        env_file=ENV_FILE_PATH,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # ← was "forbid"
@@ -99,6 +102,7 @@ class Settings(BaseSettings):
     LOG_DIR: Optional[str] = Field(default=None, description="Log directory")
     LOG_FILE_NAME: str = Field(default="app.log", description="Log file name")
     LOG_FILE_PATH: Optional[str] = Field(default=None, description="Log file full path")
+    LOG_DATETIME_FMT: Optional[str] = Field(default=None, description="Datetime format in the Log file")
     ROTATING_FILE_MAX_BYTES: int = Field(default=1024 * 1024 * 5, description="Max File size in MB")
     ROTATING_FILE_BACKUP_COUNT: int = Field(default=5, description="Backup count for rotating files")
 
@@ -154,6 +158,10 @@ class Settings(BaseSettings):
         if not self.ROOT_DIR:
             path = pathlib.Path(os.path.dirname(__file__))
             self.ROOT_DIR = str(path.parent.parent)
+
+        # Configure the Datetime format for Log statement
+        if not self.LOG_DATETIME_FMT:
+            self.LOG_DATETIME_FMT = "%d-%m-%Y %H:%M:%S"
 
         return self
 
