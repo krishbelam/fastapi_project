@@ -93,6 +93,7 @@ class Settings(BaseSettings):
         description="RabbitMQ Health Check Initial Interval Delay seconds"
     )
     RMQ_MAX_RETRIES: int = Field(default=3, description="RabbitMQ max retires during the setup")
+    ENABLE_HEALTH_CHECK_DEBUG_LOGS: bool = Field(default=True, description="Enable RabbitMQ health check logs")
 
     RMQ_INITIAL_HEALTH_CHECK_TYPE: Optional[str] = Field(default='poll', description="Initial Health check type")
 

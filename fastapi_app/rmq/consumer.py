@@ -37,6 +37,7 @@ _handlers: dict[str, MessageHandler] = {}
 def register_handler(event_type: str):
     """Decorator to register an async handler for a given event_type."""
     msg_from = "register_handler"
+
     def decorator(fn: MessageHandler):
         _handlers[event_type] = fn
         logger.info(msg_from=msg_from, msg=f"📋 Registered handler for event_type='{event_type}'")
@@ -48,14 +49,14 @@ def register_handler(event_type: str):
 # ── Example handlers ──────────────────────────────────────────────────────────
 @register_handler("user.created")
 async def handle_user_created(data: dict) -> None:
-    msg_from = "user.created"
+    msg_from = "user.created handler"
     logger.info(msg_from=msg_from, msg=f"[user.created] {data}")
     await asyncio.sleep(0.1)
 
 
 @register_handler("job.requested")
 async def handle_job_requested(data: dict) -> None:
-    msg_from = "job.requested"
+    msg_from = "job.requested handler"
     logger.info(msg_from=msg_from, msg=f"[job.requested] {data}")
     await asyncio.sleep(0.2)
 
@@ -215,7 +216,10 @@ async def _drain_tasks(timeout: float = 30.0, msg_from=None) -> None:
     Gives handlers time to ack their messages cleanly.
     """
     if not _active_tasks:
-        logger.info(msg_from=msg_from, msg=f"No tasks to Drain {len(_active_tasks)} in-flight tasks (timeout={timeout}s)")
+        logger.info(
+            msg_from=msg_from,
+            msg=f"No tasks to Drain {len(_active_tasks)} in-flight tasks (timeout={timeout}s)"
+        )
         return
     logger.info(msg_from=msg_from, msg=f"⏳ Draining {len(_active_tasks)} in-flight tasks (timeout={timeout}s)")
     try:
@@ -278,11 +282,13 @@ async def rmq_consumer(retry_delay_time=10, msg_from=None) -> None:
                 )
                 await queue.bind(exchange, routing_key=settings.RMQ_ROUTING_KEY)
 
-                logger.info(msg_from=msg_from, msg=
-                f"📨 Consuming  queue='{settings.RMQ_QUEUE}'  "
-                f"prefetch={settings.RMQ_PREFETCH_COUNT}  "
-                f"max_concurrent={settings.RMQ_MAX_CONCURRENT_TASKS}"
-                            )
+                logger.info(
+                    msg_from=msg_from,
+                    msg=(
+                        f"📨 Consuming  queue='{settings.RMQ_QUEUE}'  "
+                        f"prefetch={settings.RMQ_PREFETCH_COUNT}  "
+                        f"max_concurrent={settings.RMQ_MAX_CONCURRENT_TASKS}")
+                )
                 #
                 # async with queue.iterator() as messages:
                 #     async for message in messages:

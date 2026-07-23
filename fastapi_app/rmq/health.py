@@ -78,9 +78,11 @@ rmq_health = RMQHealthState()
 # ─────────────────────────────────────────────
 async def on_rabbitmq_down(state: RMQHealthState) -> None:
     msg_from = "RabbitMQ Down"
-    logger.error(msg_from=msg_from, msg=f"🔴 RabbitMQ DOWN at {state.last_dead.isoformat()} "
-                                        f"(failures: {state.consecutive_failures})"
-                 )
+    logger.error(
+        msg_from=msg_from,
+        msg=f"🔴 RabbitMQ DOWN at {state.last_dead.isoformat()} "
+            f"(failures: {state.consecutive_failures})"
+    )
 
 
 async def on_rabbitmq_recovered(state: RMQHealthState) -> None:
@@ -90,9 +92,8 @@ async def on_rabbitmq_recovered(state: RMQHealthState) -> None:
 
 async def on_rabbitmq_still_alive(state: RMQHealthState) -> None:
     msg_from = "RabbitMQ Still Alive"
-    # logger.info(msg_from=msg_from, msg=f"✅ RabbitMQ alive via {state.probe_method}")
-    logger.debug(msg_from=msg_from, msg=f"✅ RabbitMQ alive via {state.probe_method}")
-    # pass
+    if settings.ENABLE_HEALTH_CHECK_DEBUG_LOGS:
+        logger.debug(msg_from=msg_from, msg=f"✅ RabbitMQ alive via {state.probe_method}")
 
 
 async def on_rabbitmq_still_dead(state: RMQHealthState) -> None:
@@ -281,7 +282,8 @@ async def _run_probe(probe_timeout: float, msg_from=None) -> None:
     """
     msg_from = msg_from if msg_from else "RabbitMQ Health"
 
-    logger.debug(msg_from=msg_from, msg=f"🩺 Health checker run_probe started — timeout={probe_timeout}s")
+    if settings.ENABLE_HEALTH_CHECK_DEBUG_LOGS:
+        logger.debug(msg_from=msg_from, msg=f"🩺 Health checker run_probe started — timeout={probe_timeout}s")
 
     try:
         result = await _probe(probe_timeout)
