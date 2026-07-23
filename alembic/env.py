@@ -1,16 +1,32 @@
+import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+# ========================================================================================================
+#                       To set the data for the sync db migrations
+#                           (Uncomment if working with sync)
+# ========================================================================================================
+# from sqlalchemy import engine_from_config
+# from sqlalchemy import pool
+# from alembic import context
+# ========================================================================================================
 
+
+# ========================================================================================================
+#                       To set the data for the async db migrations
+#                               (Comment if working with sync)
+# ========================================================================================================
+import asyncio
+from sqlalchemy.ext.asyncio import async_engine_from_config, AsyncConnection
 from alembic import context
-
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
+# ========================================================================================================
 
 
+# ========================================================================================================
+#                                   Use Absolute imports
+# ========================================================================================================
 from fastapi_app.core.config import settings
 from fastapi_app.models.orm import *   # imports all mapped classes
+# ========================================================================================================
 
 
 # this is the Alembic Config object, which provides
@@ -28,19 +44,21 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None
 
+# ========================================================================================================
+#                       To set the database url from the settings in configs
+# ========================================================================================================
 config.set_main_option("sqlalchemy.url", settings.DB_URL)
 
 target_metadata = Base.metadata
+
+
+# ========================================================================================================
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-# ======================================================================================================
-#           Commented: Using alembic with async so NEW setup done in the bottom
-# ======================================================================================================
-'''
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -65,6 +83,10 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+# ======================================================================================================
+#           Commented: Using alembic with async so NEW setup done in the bottom
+# ======================================================================================================
+'''
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -92,19 +114,18 @@ if context.is_offline_mode():
 else:
     run_migrations_online()
 '''
+
+
 # ======================================================================================================
 
 # You created an async_engine but Alembic's default run_migrations_online() uses sync connect(). Fix — use asyncio.run with the async engine:
 
-# alembic/env.py
-import asyncio
-from sqlalchemy.ext.asyncio import async_engine_from_config, AsyncConnection
-from alembic import context
 
 def do_run_migrations(connection):
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()
+
 
 async def run_migrations_online():
     connectable = async_engine_from_config(
@@ -115,4 +136,10 @@ async def run_migrations_online():
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 
+
 asyncio.run(run_migrations_online())
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    asyncio.run(run_migrations_online())

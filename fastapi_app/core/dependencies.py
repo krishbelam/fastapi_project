@@ -26,7 +26,7 @@ HttpClientDep = Annotated[httpx.AsyncClient, Depends(get_http_client)]
 # ── Auth ──────────────────────────────────────────────────────────────────────
 # NOTE: fake_users_db is imported here to keep routers decoupled from storage.
 # Replace this with a real DB session dependency (SQLAlchemy async session, etc.)
-from core.store import fake_users_db   # noqa: E402  (circular-safe at runtime)
+# from core.store import fake_users_db   # noqa: E402  (circular-safe at runtime)
 
 
 def get_current_user(user_id: str) -> dict:
@@ -34,6 +34,8 @@ def get_current_user(user_id: str) -> dict:
     Resolves a user from the path parameter user_id.
     Replace with: decode JWT → look up in DB.
     """
+    from core.store import fake_users_db  # noqa: E402  (circular-safe at runtime)
+
     user = fake_users_db.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

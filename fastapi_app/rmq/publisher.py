@@ -10,15 +10,15 @@ Usage:
     await publish("user.created", {"id": user_id, "email": email})
 """
 
-import asyncio
 import json
+import asyncio
 from datetime import datetime
 
 import aio_pika
 
 from fastapi_app.core import settings
 
-from logger_engine import logger
+from fastapi_app.logger_engine import logger
 
 # Module-level connection — lazy-initialised, reused across calls
 _connection: aio_pika.RobustConnection | None = None

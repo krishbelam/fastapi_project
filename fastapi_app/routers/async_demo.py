@@ -18,6 +18,7 @@ async def demo_gather():
     asyncio.gather — run N coroutines concurrently.
     Total time ≈ max(individual times), not sum.
     """
+
     async def task(n: int) -> str:
         await asyncio.sleep(0.2 * n)
         return f"task-{n}-done"
@@ -32,6 +33,7 @@ async def demo_gather_exception():
     asyncio.gather with return_exceptions=True.
     Failed coroutines return the exception instead of propagating.
     """
+
     async def good() -> str:
         await asyncio.sleep(0.1)
         return "ok"
@@ -55,13 +57,14 @@ async def demo_create_task():
     asyncio.create_task — schedule a coroutine now, do other work, await later.
     Unlike gather, you get a handle to cancel or check status individually.
     """
+
     async def background_work() -> str:
         await asyncio.sleep(0.1)
         return "background result"
 
     task = asyncio.create_task(background_work())
     # ↑ already running concurrently while we do other work here
-    await asyncio.sleep(0.05)           # simulate other work in parallel
+    await asyncio.sleep(0.05)  # simulate other work in parallel
     result = await task
     return {"result": result}
 
@@ -72,8 +75,9 @@ async def demo_to_thread():
     asyncio.to_thread — off-load blocking code to a thread pool.
     The event loop stays free to serve other requests while this runs.
     """
+
     def slow_blocking() -> str:
-        time.sleep(0.3)                 # blocks in thread pool, NOT the event loop
+        time.sleep(0.3)  # blocks in thread pool, NOT the event loop
         return "blocking work done in thread"
 
     result = await asyncio.to_thread(slow_blocking)

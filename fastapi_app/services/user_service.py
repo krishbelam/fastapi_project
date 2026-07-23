@@ -13,11 +13,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fastapi_app.models.orm.user import User
-from fastapi_app.models.user import UserCreate
+from fastapi_app.models.orm import User
+from fastapi_app.models import UserCreate
 from fastapi_app.core import settings
 
-from logger_engine import logger
+from fastapi_app.logger_engine import logger
 
 if not settings.POOL_PRE_PING:
     from tenacity import retry, retry_if_exception_type, stop_after_attempt
@@ -54,13 +54,15 @@ if settings.POOL_PRE_PING:
         """
         return await db.get(User, user_id)
 else:
-    print(
-        "*" * 25,
-        "\nSetting up the get method with retry!!!",
-        f"\n{settings.POOL_PRE_PING=}",
-        f"\n{settings.ROOT_DIR=}\n",
-        "*" * 25
-    )
+    logger.info(
+        msg_from="User Service",
+        msg=(
+            f'{"-" * 10}'
+            " Setting up the get method with retry!!! | "
+            f"{settings.POOL_PRE_PING=} | "
+            f"{settings.ROOT_DIR=} "
+            f'{"-" * 10}'
+        ))
 
 
     @retry(

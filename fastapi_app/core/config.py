@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # DB_URL: str = Field()  # required — no default, crashes loudly if missing
     # Set defaults to None so Pydantic doesn't crash before the validator runs
     DB_URL: Optional[str] = Field(default=None, description="The primary DB connection string")
-    DB_HOST: Optional[str] = Field(default=None)
+    DB_HOST: Optional[str] = Field(default="0.0.0.0")
     # DB_PORT: Optional[int] = Field(default=3306)  # Default MySQL port
     DB_PORT: Optional[int] = Field(default=None)  # To raise exception if port is missing from .env
     DB_USER: Optional[str] = Field(default=None)
@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     LOG_DATETIME_FMT: Optional[str] = Field(default=None, description="Datetime format in the Log file")
     ROTATING_FILE_MAX_BYTES: int = Field(default=1024 * 1024 * 5, description="Max File size in MB")
     ROTATING_FILE_BACKUP_COUNT: int = Field(default=5, description="Backup count for rotating files")
+
+    # ── Token Configs ─────────────────────────
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=5, description="Access token expire time in minutes")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=15, description="Refresh token expire time in days")
 
     @model_validator(mode="after")
     def validate_or_build_db_url(self) -> "Settings":

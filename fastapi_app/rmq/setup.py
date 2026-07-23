@@ -6,21 +6,21 @@ Production-grade RabbitMQ setup using aio-pika.
 """
 
 import asyncio
-import logging
 import aio_pika
 
 from fastapi_app.core import settings
 
-logger = logging.getLogger(__name__)
+from fastapi_app.logger_engine import logger
 
 
 # ── Consumer loop ─────────────────────────────────────────────────────────────
-async def rmq_setup(max_retries=3) -> None:
+async def rmq_setup(max_retries=3, msg_from=None) -> None:
     """
     Runs for the entire app lifetime (started as asyncio.create_task in lifespan).
 
     """
-    logger.info(f"📨 RabbitMQ Queue Setup starting, max_retries was set to {max_retries}")
+    msg_from = msg_from if msg_from else "RabbitMQ Setup"
+    logger.info(msg_from=msg_from, msg=f"📨 RabbitMQ Queue Setup starting, max_retries was set to {max_retries}")
 
     # Clean up retries
     if not isinstance(max_retries, int) or max_retries <= 0:
@@ -43,7 +43,7 @@ async def rmq_setup(max_retries=3) -> None:
                 settings.RABBITMQ_URL,
                 reconnect_interval=5,
             )
-            logger.info("✅ RabbitMQ setup connected")
+            logger.info(msg_from=msg_from, msg="✅ RabbitMQ setup connected")
 
             async with connection:
                 channel = await connection.channel()
@@ -61,7 +61,8 @@ async def rmq_setup(max_retries=3) -> None:
                 await queue.bind(exchange, routing_key=settings.RMQ_ROUTING_KEY)
 
                 logger.info(
-                    f"📨 Setting up the queue='{settings.RMQ_QUEUE}' with Exchange=`{settings.RMQ_EXCHANGE}`"
+                    msg_from=msg_from,
+                    msg=f"📨 Setting up the queue='{settings.RMQ_QUEUE}' with Exchange=`{settings.RMQ_EXCHANGE}`"
                 )
 
                 break
@@ -70,19 +71,21 @@ async def rmq_setup(max_retries=3) -> None:
         # AMQPChannelError → AMQPConnectionError → CancelledError → Exception
         except aio_pika.exceptions.AMQPChannelError as exc:
             logger.error(
-                f"💥 Channel error — queue '{settings.RMQ_QUEUE}' likely deleted: {exc}  "
-                f"retrying in{retry_delay_time}s"
+                msg_from=msg_from,
+                msg=f"💥 Channel error — queue '{settings.RMQ_QUEUE}' likely deleted: {exc}  "
+                    f"retrying in{retry_delay_time}s"
             )
             await asyncio.sleep(retry_delay_time)
             attempt += 1
 
         except aio_pika.exceptions.AMQPConnectionError as exc:
-            logger.warning(f"🔴 RabbitMQ connection lost: {exc} — retrying in 5{retry_delay_time}")
+            logger.warning(msg_from=msg_from,
+                           msg=f"🔴 RabbitMQ connection lost: {exc} — retrying in 5{retry_delay_time}")
             await asyncio.sleep(retry_delay_time)
             attempt += 1
 
         except Exception as exc:
-            logger.error(f"💥 Unexpected error: {exc} — retrying in {retry_delay_time}s")
+            logger.error(msg_from=msg_from, msg=f"💥 Unexpected error: {exc} — retrying in {retry_delay_time}s")
             await asyncio.sleep(retry_delay_time)
             attempt += 1
 

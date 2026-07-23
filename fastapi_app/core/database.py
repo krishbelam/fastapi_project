@@ -1,6 +1,7 @@
-# core/database.py
+# fastapi_app/core/database.py
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from core import settings
+
+from fastapi_app.core import settings
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 # One engine per process — holds the connection pool

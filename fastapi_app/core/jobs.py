@@ -14,9 +14,9 @@ import time
 from datetime import datetime
 from typing import Any
 
-from core.store import broadcast_ws, job_status_store
+from .store import broadcast_ws, job_status_store
 
-from logger_engine import logger
+from fastapi_app.logger_engine import logger
 
 
 # ── Async variant ─────────────────────────────────────────────────────────────

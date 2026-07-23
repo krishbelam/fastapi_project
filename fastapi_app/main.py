@@ -30,7 +30,7 @@ from fastapi_app.core import settings, active_connections, broadcast_ws
 from fastapi_app.rmq import close as close_publisher, rmq_consumer, rmq_health_checker, rmq_setup
 from fastapi_app.routers import async_demo_router, health_router, jobs_router, users_router
 
-from logger_engine import logger, start_listener, stop_listener
+from fastapi_app.logger_engine import logger, start_listener, stop_listener
 
 
 # ─────────────────────────────────────────────
@@ -50,14 +50,35 @@ async def lifespan(app: FastAPI):
     msg_from = "App LifeSpan"
 
     start_listener()
+    app_workers = settings.APP_WORKERS
 
-    logger.info(msg_from=msg_from, msg="🚀 Starting up")
+    try:
+        app_workers = int(app_workers)
+    except (ValueError, TypeError) as e:
+        logger.warning(
+            msg_from=msg_from,
+            msg=f"Failed to evaluate APP_WORKERS, Exception: {e}"
+        )
+        app_workers = 1
+
+    debug_mode = "ON" if settings.APP_DEBUG else "OFF"
+    effective_workers = 1 if settings.APP_DEBUG else app_workers
+
+    logger.info(
+        msg_from=msg_from,
+        msg=(
+            f"🚀 Starting up | "
+            f"Configured Workers: {app_workers} | "
+            f"Effective Workers: {effective_workers} | "
+            f"Debug Mode: {'ON' if settings.APP_DEBUG else 'OFF'}"
+        )
+    )
 
     # Shared async HTTP client — one connection pool for the whole process
     app.state.http_client = httpx.AsyncClient(timeout=10.0)
 
     # To setup the RabbitMQ Exchange, Queue and Binding them
-    await rmq_setup()
+    await rmq_setup(msg_from=msg_from)
 
     # RabbitMQ consumer — reconnects on broker restart
     # consumer_task = asyncio.create_task(rmq_consumer(), name="mq-consumer")
@@ -120,7 +141,8 @@ async def request_timing_middleware(request: Request, call_next):
     start = time.perf_counter()
     response = await call_next(request)
     elapsed = (time.perf_counter() - start) * 1000
-    logger.info(msg_from=msg_from, msg=f"{request.method} {request.url.path} → {response.status_code} ({elapsed:.1f}ms)")
+    logger.info(msg_from=msg_from,
+                msg=f"{request.method} {request.url.path} → {response.status_code} ({elapsed:.1f}ms)")
     response.headers["X-Process-Time-Ms"] = f"{elapsed:.1f}"
     return response
 

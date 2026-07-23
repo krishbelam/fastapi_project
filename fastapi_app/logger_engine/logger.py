@@ -247,7 +247,7 @@ class Logger(object):
         file, fun, lineno = current_stack_info.filename, current_stack_info.function, current_stack_info.lineno
         file = file.rsplit(settings.ROOT_DIR, 1)[1]
         dt = datetime.datetime.now().strftime(settings.LOG_DATETIME_FMT)
-        msg = f"{dt} {msg_from} [{log_level}] .{file} - {fun} : {lineno} | {msg}"
+        msg = f"{msg_from} [{log_level}] {dt} | .{file} - {fun} : {lineno} | {msg}"
         return msg
 
     def debug(self, msg, msg_from=None):

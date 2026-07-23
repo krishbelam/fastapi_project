@@ -9,7 +9,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from rmq.health import (
+from fastapi_app.rmq import (
     RMQHealthState,
     RMQStatus,
     rmq_health,

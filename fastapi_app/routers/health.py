@@ -8,7 +8,8 @@ from datetime import datetime
 
 from fastapi import APIRouter
 
-from fastapi_app.rmq.health import rmq_health
+from fastapi_app.rmq import rmq_health
+from fastapi_app.logger_engine import logger
 
 router = APIRouter(prefix="/health", tags=["Meta"])
 
@@ -29,6 +30,9 @@ async def rabbitmq_health():
       dead      — last probe failed (see consecutive_failures)
       recovered — came back after being dead
     """
-    print(f"id(rmq_health)={id(rmq_health)}  status={rmq_health.status}")
+    logger.debug(
+        msg_from="RabbitMQ Health Endpoint",
+        msg=f"id(rmq_health)={id(rmq_health)}  status={rmq_health.status}"
+    )
 
     return rmq_health.to_dict()

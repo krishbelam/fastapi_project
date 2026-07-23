@@ -5,16 +5,13 @@ Background job submission and status polling.
 """
 
 import uuid
-import logging
-from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from core.jobs import dispatch_job
-from core.store import job_status_store
-from models.job import JobRequest, JobStatusResponse
+from fastapi_app.core import dispatch_job, job_status_store
+from fastapi_app.models import JobRequest, JobStatusResponse
 
-logger = logging.getLogger(__name__)
+from fastapi_app.logger_engine import logger
 
 router = APIRouter(prefix="/jobs", tags=["Background Jobs"])
 
@@ -28,10 +25,10 @@ async def submit_job(body: JobRequest, background_tasks: BackgroundTasks):
     """
     job_id = str(uuid.uuid4())
     job_status_store[job_id] = {
-        "job_id":      job_id,
-        "status":      "pending",
-        "result":      None,
-        "started_at":  None,
+        "job_id": job_id,
+        "status": "pending",
+        "result": None,
+        "started_at": None,
         "finished_at": None,
     }
     background_tasks.add_task(dispatch_job, job_id, body.payload, body.sync)

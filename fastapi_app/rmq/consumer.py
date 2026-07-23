@@ -25,9 +25,8 @@ from aio_pika import IncomingMessage
 from aio_pika.exceptions import QueueEmpty
 
 from fastapi_app.core import settings
-from fastapi_app.rmq.health import set_shared_channel, rmq_health, RMQStatus
-from fastapi_app.rmq.setup import rmq_setup
-from logger_engine import logger
+from fastapi_app.rmq.health import set_shared_channel, rmq_health, RMQStatus, rmq_setup
+from fastapi_app.logger_engine import logger
 
 MessageHandler = Callable[[dict], Awaitable[None]]
 
@@ -318,7 +317,7 @@ async def rmq_consumer(retry_delay_time=10, msg_from=None) -> None:
             f"💥 Channel error — queue '{settings.RMQ_QUEUE}' likely deleted: {exc}  "
             f"retrying in{retry_delay_time}s"
                          )
-            await rmq_setup()  # <--- Recreates the missing Queue
+            await rmq_setup(msg_from=msg_from)  # <--- Recreates the missing Queue
             await asyncio.sleep(retry_delay_time)
 
         except aio_pika.exceptions.AMQPConnectionError as exc:

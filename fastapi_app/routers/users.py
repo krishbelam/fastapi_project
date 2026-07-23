@@ -11,12 +11,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi_app.core import get_db, require_admin
-from fastapi_app.models.user import UserCreate, UserResponse, UserUpdate
-from fastapi_app.rmq.publisher import publish
+from fastapi_app.rmq import publish
 from fastapi_app.services import user_service
+from fastapi_app.core import get_db, require_admin
+from fastapi_app.models import UserCreate, UserResponse, UserUpdate
 
-from logger_engine import logger
+from fastapi_app.logger_engine import logger
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
