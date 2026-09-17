@@ -14,7 +14,7 @@ from main import app
 @pytest.fixture
 async def client():
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
 
@@ -38,7 +38,7 @@ async def test_submit_sync_job(client):
 @pytest.mark.asyncio
 async def test_job_status_polling(client):
     # Submit
-    resp  = await client.post("/jobs/", json={"payload": {"n": 42}, "sync": False})
+    resp = await client.post("/jobs/", json={"payload": {"n": 42}, "sync": False})
     job_id = resp.json()["job_id"]
 
     # Poll until done (async job takes ~1s)

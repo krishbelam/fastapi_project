@@ -9,38 +9,59 @@ RabbitMQ consumer + publisher + health checker, WebSocket, and tests.
 ## Project structure
 
 ```
-fastapi_app/
-├── main.py                   lifespan · middleware · WebSocket · router registration
-├── pyproject.toml            aio-pika · pydantic-settings · uvicorn · httpx
-├── pytest.ini                asyncio_mode = auto
-├── .env.example
-│
-├── core/
-│   ├── config.py             pydantic-settings → reads .env (RMQ URL, intervals, prefetch)
-│   ├── dependencies.py       get_http_client · get_current_user · require_admin
-│   ├── jobs.py               dispatch_job → _async_job (gather) or _blocking_job (to_thread)
-│   └── store.py              fake_users_db · job_status_store · broadcast_ws()
-│
-├── models/
-│   ├── user.py               UserCreate (validators) · UserResponse (computed_field)
-│   └── job.py                JobRequest (sync flag) · JobStatusResponse
-│
-├── routers/
-│   ├── users.py              CRUD + publishes user.created / user.deleted to RMQ
-│   ├── jobs.py               POST /jobs 202 · GET /jobs/{id} poll
-│   ├── async_demo.py         gather · create_task · to_thread · sleep
-│   └── health.py             GET /health · GET /health/rabbitmq
-│
-├── rmq/
-│   ├── consumer.py           aio-pika loop · @register_handler · ack/nack · reconnect
-│   ├── health.py             state machine: UNKNOWN → ALIVE/DEAD → RECOVERED
-│   └── publisher.py          lazy robust connection · PERSISTENT delivery mode
-│
-└── tests/
-    ├── conftest.py
-    ├── test_users.py          Pydantic validators, CRUD, RMQ mocked
-    ├── test_jobs.py           submit, poll, async + sync paths
-    └── test_rmq_health.py     state transitions, no broker needed
+fastapi_project/          ← project root
+├── alembic/              ✅ stays here
+│   ├── env.py
+│   └── versions/
+├── alembic.ini           ✅ stays here
+├── pyproject.toml
+├── fastapi_app/          ← your application package
+│    ├── main.py                      ← thin entry point: lifespan, middleware, WS, routers
+│    │
+│    ├── core/
+│    │   ├── config.py                ← pydantic-settings (reads .env)
+│    │   ├── database.py              ← async engine, AsyncSession, get_db() dependency
+│    │   ├── dependencies.py          ← all Depends() functions
+│    │   ├── jobs.py                  ← background job dispatch (async + sync via to_thread)
+│    │   └── store.py                 ← WS broadcaster (swap job_status_store → Redis)
+│    │
+│    ├── models/
+│    │   ├── user.py                  ← UserCreate, UserResponse (Pydantic v2)
+│    │   ├── job.py                   ← JobRequest, JobStatusResponse
+│    │   └── orm/
+│    │       ├── base.py              ← DeclarativeBase
+│    │       ├── user.py              ← User SQLAlchemy mapped class
+│    │       └── job.py               ← Job SQLAlchemy mapped class
+│    │
+│    ├── services/
+│    │   ├── user_service.py          ← DB logic for users (create, get, list, delete)
+│    │   └── job_service.py           ← DB logic for jobs (submit, poll, update status)
+│    │
+│    ├── routers/
+│    │   ├── users.py                 ← CRUD → user_service → DB · publishes RMQ events
+│    │   ├── jobs.py                  ← submit + poll background jobs
+│    │   ├── async_demo.py            ← gather, create_task, to_thread, sleep demos
+│    │   └── health.py                ← /health · /health/rabbitmq
+│    │
+│    ├── auth/
+│    │   ├── jwt.py                   ← PyJWT create/decode access tokens
+│    │   ├── refresh.py               ← refresh token rotation + revocation
+│    │   └── dependencies.py          ← get_current_user via OAuth2PasswordBearer
+│    │
+│    ├── rmq/
+│    │   ├── consumer.py              ← aio-pika · passive=True · semaphore · task drain
+│    │   ├── health.py                ← UNKNOWN/ALIVE/DEAD/DEGRADED/RECOVERED state machine
+│    │   └── publisher.py             ← lazy robust connection · persistent delivery
+│    │
+│    ├── alembic/
+│    │   ├── env.py                   ← async migration runner (asyncio.run + run_sync)
+│    │   └── versions/                ← auto-generated migration scripts
+│    │
+│    └── tests/
+│        ├── conftest.py
+│        ├── test_users.py
+│        ├── test_jobs.py
+│        └── test_rmq_health.py       ← state machine unit tests, no broker needed
 ```
 
 ---
@@ -58,7 +79,7 @@ uv sync
 uv run uvicorn main:app --reload
 
 # 4. open interactive docs
-open http://localhost:8000/docs
+open http://localhost:9000/docs
 ```
 
 ## 📦 Project-Based Commands (Recommended)
@@ -182,7 +203,7 @@ Sample App Starting Logs:
 ```bash
 (fastapi_project) fastapi_project|master⚡ ⇒ uv run uvicorn main:app --reload
 INFO:     Will watch for changes in these directories: ['/home/krishna/Desktop/My_Space/fastapi_project']
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:9000 (Press CTRL+C to quit)
 INFO:     Started reloader process [291365] using WatchFiles
 INFO:     Started server process [291367]
 INFO:     Waiting for application startup.
